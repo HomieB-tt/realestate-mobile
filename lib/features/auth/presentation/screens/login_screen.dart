@@ -13,22 +13,22 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
+  final _passwordController = TextEditingController();
 
-  bool _otpSent = false;
   bool _loading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _otpController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
+  Future<void> _signIn() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) return;
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) return;
 
     setState(() {
       _loading = true;
@@ -36,47 +36,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     final repo = ref.read(authRepositoryProvider);
-    final result = await repo.sendOtp(email);
+    final result = await repo.signInWithPassword(email: email, password: password);
 
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      if (result is AuthSuccess<void>) {
-        _otpSent = true;
-      } else if (result is AuthError<void>) {
-        _errorMessage = result.failure.message;
-      }
-    });
-  }
-
-  Future<void> _verifyOtp() async {
-    final email = _emailController.text.trim();
-    final token = _otpController.text.trim();
-    if (token.isEmpty) return;
-
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
-
-    final repo = ref.read(authRepositoryProvider);
-    final result = await repo.verifyOtp(email: email, token: token);
-
-    if (!mounted) return;
-    setState(() => _loading = false);
 
     if (result is AuthSuccess<AppUser>) {
       // Auth state change triggers currentUserProvider to refresh;
       // navigation to the authenticated shell is handled by the root
       // widget watching that provider (see main.dart).
+      setState(() => _loading = false);
     } else if (result is AuthError<AppUser>) {
-      // Extract the message here, while `result` is still promoted to
-      // AuthError<AppUser> — type promotion does not carry across
-      // closure boundaries, so reading `.failure` inside the setState
-      // callback below (where `result`'s static type reverts to the
-      // unpromoted AuthResult<AppUser>) would fail to compile.
       final message = result.failure.message;
-      setState(() => _errorMessage = message);
+      setState(() {
+        _loading = false;
+        _errorMessage = message;
+      });
     }
   }
 
@@ -93,45 +67,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Text('Welcome', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
               Text(
-                _otpSent
-                    ? 'Enter the code we sent to ${_emailController.text.trim()}'
-                    : 'Sign in with your email — no password needed.',
+                'Sign in with your email and password.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
               TextField(
                 controller: _emailController,
-                enabled: !_otpSent && !_loading,
+                enabled: !_loading,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email', hintText: 'you@example.com'),
               ),
-              if (_otpSent) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _otpController,
-                  enabled: !_loading,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '6-digit code'),
-                ),
-              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                enabled: !_loading,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+                onSubmitted: (_) => _signIn(),
+              ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
                 Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _loading ? null : (_otpSent ? _verifyOtp : _sendOtp),
+                onPressed: _loading ? null : _signIn,
                 child: _loading
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_otpSent ? 'Verify code' : 'Send code'),
+                    : const Text('Sign in'),
               ),
-              if (_otpSent) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _loading ? null : () => setState(() => _otpSent = false),
-                  child: const Text('Use a different email'),
-                ),
-              ],
             ],
           ),
         ),

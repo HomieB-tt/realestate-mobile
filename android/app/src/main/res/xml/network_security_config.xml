@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Allows plain HTTP (cleartext) traffic ONLY to the local dev backend IP.
+  Android blocks cleartext by default from API 28+; this scopes the
+  exception narrowly rather than disabling the protection app-wide.
+  Remove or restrict this once the backend is served over HTTPS
+  (e.g. once deployed behind a real domain/TLS cert).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.240.1</domain>
+        <!-- Android emulator (AVD) loopback alias, in case you switch off Waydroid later -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
