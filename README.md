@@ -55,12 +55,59 @@ flutter analyze
 
 as your first step, and paste back any errors — same troubleshooting loop we used for the backend.
 
-## Auth flow implemented
+## Required native permissions (Android)
 
-Email OTP (per architecture spec) — `LoginScreen` sends a one-time code to the user's email via `AuthRepository.sendOtp()`, then verifies it via `verifyOtp()`. `signInWithPassword()` is also implemented on the repository in case you want a password-based flow for agent/admin accounts later, just not wired into the UI yet.
+Two new packages were added this round — `geolocator` and `image_picker` —
+and both need entries in `android/app/src/main/AndroidManifest.xml`, which
+`flutter create` generated on your machine and isn't something I can edit
+directly. Add these `<uses-permission>` entries as siblings of
+`<application>`, inside the outer `<manifest>` tag:
+
+```xml
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+`image_picker` on Android 13+ uses the system Photo Picker, which needs no
+extra runtime permission for gallery access. If you also want camera
+capture (not just gallery), add:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+```
+
+Waydroid/emulators without a real GPS may report `LocationServiceDisabled`
+or an inaccurate/zeroed position — the search screen falls back to the
+demo coordinate automatically in that case (see `PropertyListScreen`), so
+this isn't a blocker for testing, just something to expect until you're
+on a device with real GPS.
+
+## New in this round
+
+- **Navigation shell** (`features/shell/root_shell.dart`) — bottom tabs: Search, Bookings, Listings (agent-only), Account. Previously there was no way to sign out from the app at all; that's now on the Account tab.
+- **Create listing** (`features/property/presentation/screens/create_property_screen.dart`) — full form + multi-image picker, with a "publish immediately" toggle.
+- **Image upload** — goes directly to Supabase (Storage + the `property_images` table), NOT through the custom backend, since the backend never got a `property_images` endpoint. Authorization is enforced entirely by the RLS policies already in `001_init_schema.sql` — worth being aware that this is the one write path in the app where there's no server-side check backing up the database, only RLS itself.
+- **My Listings** / **My Bookings** screens — now have actual UI (the providers existed before, nothing consumed them).
+- **Real geolocation** — `core/location/location_service.dart`, with graceful fallback to the demo coordinate if permissions/services aren't available.
+- **Publish from the detail screen** — agents can now publish a draft without going back to a list view, if they're viewing their own draft.
+
+
+
+## Auth flow
+
+**Password sign-in** is what's currently wired into `LoginScreen`. OTP
+(`AuthRepository.sendOtp()`/`verifyOtp()`) is still implemented on the
+repository and matches the architecture spec's preferred flow, but isn't
+in the UI right now — Supabase restricted email template customization
+(needed to show the raw OTP code rather than just a magic link) behind
+custom SMTP as of a June 2026 anti-abuse policy change. Revisit OTP once
+custom SMTP is set up; swapping the UI back is a small, contained change
+since the repository layer already supports both.
 
 ## What's implemented vs. stubbed
 
-**Implemented:** auth (OTP), property search (radius-based, matches the live `/properties/search` endpoint), property detail, create-draft + publish flow (repository/provider level — no "create listing" form screen yet), book-a-viewing flow with the 409 slot-conflict surfaced as a distinct, user-friendly message (not a generic error).
+**Implemented:** auth (password), property search (radius-based, real geolocation with fallback), property detail with photo strip, create-listing form with multi-image upload, owner-publish from the detail screen, book-a-viewing flow with 409 slot-conflict surfaced distinctly, My Listings (agent), My Bookings (client, with cancel), sign-out.
 
-**Not yet built:** image upload to Supabase Storage, a "create/edit listing" form screen for agents, "my listings" / "my bookings" screens (providers exist — `myPropertiesProvider`, `myViewingsProvider` — just no screen consuming them yet), device geolocation (search currently defaults to a fixed demo coordinate).
+**Not yet built:** edit-listing screen (create-only, no update form yet), image reordering/cover selection after upload, agent-side viewing confirmation UI (the `confirm()` repository method exists, no screen calls it), OTP re-enabled once custom SMTP is set up, and this UI hasn't had a visual design pass — it's functional Material 3 defaults.
+

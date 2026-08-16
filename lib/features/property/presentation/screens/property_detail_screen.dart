@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/app_failure.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../viewing/domain/entities/viewing.dart';
 import '../../../viewing/presentation/providers/viewing_providers.dart';
 import '../providers/property_providers.dart';
+import '../../domain/entities/property.dart';
 import '../../domain/repositories/property_repository.dart' show Success, Failure;
 
 class PropertyDetailScreen extends ConsumerWidget {
@@ -14,6 +16,8 @@ class PropertyDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final propertyAsync = ref.watch(propertyByIdProvider(propertyId));
+    final imagesAsync = ref.watch(propertyImagesProvider(propertyId));
+    final currentUserAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Property')),
@@ -23,43 +27,79 @@ class PropertyDetailScreen extends ConsumerWidget {
           child: Text(error is AppFailure ? error.message : 'Something went wrong.'),
         ),
         data: (property) {
+          final isOwner = currentUserAsync.value?.id == property.agentId;
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(property.title, style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 4),
-                Text('${property.addressLine}, ${property.city}, ${property.country}'),
-                const SizedBox(height: 12),
-                Text(
-                  property.formattedPrice,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _StatIcon(icon: Icons.bed_outlined, label: '${property.bedrooms} bed'),
-                    const SizedBox(width: 16),
-                    _StatIcon(icon: Icons.bathtub_outlined, label: '${property.bathrooms} bath'),
-                    if (property.areaSqm != null) ...[
-                      const SizedBox(width: 16),
-                      _StatIcon(icon: Icons.straighten, label: '${property.areaSqm} m²'),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Text(property.description),
-                const SizedBox(height: 28),
-                if (property.status.name == 'published')
-                  ElevatedButton.icon(
-                    onPressed: () => _showBookingSheet(context, ref, property.id),
-                    icon: const Icon(Icons.calendar_month_outlined),
-                    label: const Text('Book a viewing'),
+                imagesAsync.when(
+                  loading: () => const SizedBox(
+                    height: 220,
+                    child: Center(child: CircularProgressIndicator()),
                   ),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (images) {
+                    if (images.isEmpty) return const SizedBox.shrink();
+                    return SizedBox(
+                      height: 220,
+                      child: PageView.builder(
+                        itemCount: images.length,
+                        itemBuilder: (context, index) => Image.network(
+                          images[index].publicUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (_, __, ___) => const ColoredBox(
+                            color: Colors.black12,
+                            child: Center(child: Icon(Icons.broken_image_outlined)),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(property.title, style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      Text('${property.addressLine}, ${property.city}, ${property.country}'),
+                      const SizedBox(height: 12),
+                      Text(
+                        property.formattedPrice,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _StatIcon(icon: Icons.bed_outlined, label: '${property.bedrooms} bed'),
+                          const SizedBox(width: 16),
+                          _StatIcon(icon: Icons.bathtub_outlined, label: '${property.bathrooms} bath'),
+                          if (property.areaSqm != null) ...[
+                            const SizedBox(width: 16),
+                            _StatIcon(icon: Icons.straighten, label: '${property.areaSqm} m²'),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(property.description),
+                      const SizedBox(height: 28),
+                      if (property.status == PropertyStatus.published)
+                        ElevatedButton.icon(
+                          onPressed: () => _showBookingSheet(context, ref, property.id),
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: const Text('Book a viewing'),
+                        )
+                      else if (property.status == PropertyStatus.draft && isOwner)
+                        _PublishButton(propertyId: property.id),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -90,6 +130,63 @@ class _StatIcon extends StatelessWidget {
         Icon(icon, size: 18, color: Theme.of(context).colorScheme.outline),
         const SizedBox(width: 4),
         Text(label),
+      ],
+    );
+  }
+}
+
+class _PublishButton extends ConsumerStatefulWidget {
+  const _PublishButton({required this.propertyId});
+  final String propertyId;
+
+  @override
+  ConsumerState<_PublishButton> createState() => _PublishButtonState();
+}
+
+class _PublishButtonState extends ConsumerState<_PublishButton> {
+  bool _publishing = false;
+  String? _errorMessage;
+
+  Future<void> _publish() async {
+    setState(() {
+      _publishing = true;
+      _errorMessage = null;
+    });
+
+    final repo = ref.read(propertyRepositoryProvider);
+    final result = await repo.publish(widget.propertyId);
+
+    if (!mounted) return;
+
+    switch (result) {
+      case Success():
+        ref.invalidate(propertyByIdProvider(widget.propertyId));
+        ref.invalidate(myPropertiesProvider);
+        setState(() => _publishing = false);
+      case Failure(:final failure):
+        setState(() {
+          _publishing = false;
+          _errorMessage = failure.message;
+        });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _publishing ? null : _publish,
+          icon: _publishing
+              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.publish_outlined),
+          label: const Text('Publish listing'),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 8),
+          Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ],
       ],
     );
   }
