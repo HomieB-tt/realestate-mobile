@@ -25,17 +25,33 @@ final propertyImageRepositoryProvider = Provider<PropertyImageRepository>((ref) 
 /// automatically since it watches this provider.
 final searchParamsProvider = StateProvider<RadiusSearchParams?>((ref) => null);
 
-/// Fetches nearby published properties for the current search params.
-/// Returns an empty list (rather than erroring) until a search has been
-/// performed, so the UI can distinguish "no search yet" from "0 results"
-/// at the screen level if desired.
+/// City name currently being searched, if the user has switched to city
+/// search mode. Null means "use location-based radius search instead".
+/// Setting this takes priority over `searchParamsProvider` in
+/// `nearbyPropertiesProvider` below.
+final citySearchProvider = StateProvider<String?>((ref) => null);
+
+/// Fetches published properties for the current search — either a city
+/// search (if `citySearchProvider` is set) or a location-radius search
+/// (via `searchParamsProvider`) otherwise. Returns an empty list (rather
+/// than erroring) until a search has been performed, so the UI can
+/// distinguish "no search yet" from "0 results" at the screen level.
 final nearbyPropertiesProvider = FutureProvider.autoDispose<List<Property>>((ref) async {
+  final repo = ref.watch(propertyRepositoryProvider);
+  final city = ref.watch(citySearchProvider);
+
+  if (city != null && city.trim().isNotEmpty) {
+    final result = await repo.searchByCity(city.trim());
+    return switch (result) {
+      Success(:final value) => value,
+      Failure(:final failure) => throw failure,
+    };
+  }
+
   final params = ref.watch(searchParamsProvider);
   if (params == null) return const [];
 
-  final repo = ref.watch(propertyRepositoryProvider);
   final result = await repo.searchNearby(params);
-
   return switch (result) {
     Success(:final value) => value,
     Failure(:final failure) => throw failure,

@@ -44,9 +44,15 @@ class RadiusSearchParams {
 /// used on the backend.
 abstract interface class PropertyRepository {
   Future<Result<List<Property>>> searchNearby(RadiusSearchParams params);
+
+  /// City search — no proximity constraint, unlike searchNearby. Finds
+  /// matches regardless of the searcher's current location.
+  Future<Result<List<Property>>> searchByCity(String city);
+
   Future<Result<Property>> getById(String id);
   Future<Result<Property>> createDraft(NewPropertyInput input);
   Future<Result<Property>> publish(String id);
+  Future<Result<Property>> unpublish(String id);
   Future<Result<List<Property>>> listMine();
   Future<Result<void>> remove(String id);
 }

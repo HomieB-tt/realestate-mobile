@@ -27,6 +27,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
 
   static const _locationService = LocationService();
 
+  final _searchController = TextEditingController();
   bool _usingFallbackLocation = false;
 
   @override
@@ -35,7 +36,20 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolveLocationAndSearch());
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _resolveLocationAndSearch() async {
+    // A city search stays active across a pull-to-refresh; only fall
+    // back to re-resolving location when no city search is active.
+    if (ref.read(citySearchProvider) != null) {
+      ref.invalidate(nearbyPropertiesProvider);
+      return;
+    }
+
     final result = await _locationService.getCurrentLocation();
 
     if (!mounted) return;
@@ -58,15 +72,53 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
     }
   }
 
+  void _submitCitySearch(String value) {
+    final trimmed = value.trim();
+    ref.read(citySearchProvider.notifier).state = trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _clearCitySearch() {
+    _searchController.clear();
+    ref.read(citySearchProvider.notifier).state = null;
+    FocusScope.of(context).unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final propertiesAsync = ref.watch(nearbyPropertiesProvider);
+    final activeCitySearch = ref.watch(citySearchProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nearby listings')),
       body: Column(
         children: [
-          if (_usingFallbackLocation)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: _submitCitySearch,
+              decoration: InputDecoration(
+                hintText: 'Search by city…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: activeCitySearch != null
+                    ? IconButton(icon: const Icon(Icons.close), onPressed: _clearCitySearch)
+                    : null,
+              ),
+            ),
+          ),
+          if (activeCitySearch != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Showing results for "$activeCitySearch" — clear to search near you instead.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            )
+          else if (_usingFallbackLocation)
             Container(
               width: double.infinity,
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -92,7 +144,13 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: SizedBox(
                           height: constraints.maxHeight,
-                          child: const Center(child: Text('No listings found nearby yet.')),
+                          child: Center(
+                            child: Text(
+                              activeCitySearch != null
+                                  ? 'No listings found in "$activeCitySearch".'
+                                  : 'No listings found nearby yet.',
+                            ),
+                          ),
                         ),
                       ),
                     );

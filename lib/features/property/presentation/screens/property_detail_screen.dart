@@ -90,7 +90,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 20),
                       Text(property.description),
                       const SizedBox(height: 28),
-                      if (property.status == PropertyStatus.published && isOwner)
+                      if (property.status == PropertyStatus.published && isOwner) ...[
                         ElevatedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute(
@@ -99,8 +99,10 @@ class PropertyDetailScreen extends ConsumerWidget {
                           ),
                           icon: const Icon(Icons.list_alt_outlined),
                           label: const Text('View booking requests'),
-                        )
-                      else if (property.status == PropertyStatus.published)
+                        ),
+                        const SizedBox(height: 8),
+                        _UnpublishButton(propertyId: property.id),
+                      ] else if (property.status == PropertyStatus.published)
                         ElevatedButton.icon(
                           onPressed: () => _showBookingSheet(context, ref, property.id),
                           icon: const Icon(Icons.calendar_month_outlined),
@@ -193,6 +195,82 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
               ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.publish_outlined),
           label: const Text('Publish listing'),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 8),
+          Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ],
+      ],
+    );
+  }
+}
+
+class _UnpublishButton extends ConsumerStatefulWidget {
+  const _UnpublishButton({required this.propertyId});
+  final String propertyId;
+
+  @override
+  ConsumerState<_UnpublishButton> createState() => _UnpublishButtonState();
+}
+
+class _UnpublishButtonState extends ConsumerState<_UnpublishButton> {
+  bool _unpublishing = false;
+  String? _errorMessage;
+
+  Future<void> _confirmAndUnpublish() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Unpublish listing?'),
+        content: const Text(
+          'This listing will stop appearing in client search. You can publish it again anytime.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Unpublish'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _unpublishing = true;
+      _errorMessage = null;
+    });
+
+    final repo = ref.read(propertyRepositoryProvider);
+    final result = await repo.unpublish(widget.propertyId);
+
+    if (!mounted) return;
+
+    switch (result) {
+      case Success():
+        ref.invalidate(propertyByIdProvider(widget.propertyId));
+        ref.invalidate(myPropertiesProvider);
+        setState(() => _unpublishing = false);
+      case Failure(:final failure):
+        setState(() {
+          _unpublishing = false;
+          _errorMessage = failure.message;
+        });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _unpublishing ? null : _confirmAndUnpublish,
+          icon: _unpublishing
+              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.unpublished_outlined),
+          label: const Text('Unpublish listing'),
         ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 8),

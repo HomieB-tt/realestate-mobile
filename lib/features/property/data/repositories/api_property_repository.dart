@@ -35,6 +35,20 @@ class ApiPropertyRepository implements PropertyRepository {
   }
 
   @override
+  Future<Result<List<Property>>> searchByCity(String city) async {
+    try {
+      final response = await _api.get<Map<String, dynamic>>(
+        '/properties/search',
+        queryParameters: {'city': city},
+      );
+      final list = response.data!['data'] as List<dynamic>;
+      return Success(PropertyDto.listFromJson(list));
+    } on DioException catch (e) {
+      return Failure(mapDioErrorToFailure(e));
+    }
+  }
+
+  @override
   Future<Result<Property>> getById(String id) async {
     try {
       final response = await _api.get<Map<String, dynamic>>('/properties/$id');
@@ -61,6 +75,16 @@ class ApiPropertyRepository implements PropertyRepository {
   Future<Result<Property>> publish(String id) async {
     try {
       final response = await _api.post<Map<String, dynamic>>('/properties/$id/publish');
+      return Success(PropertyDto.fromJson(response.data!['data'] as Map<String, dynamic>));
+    } on DioException catch (e) {
+      return Failure(mapDioErrorToFailure(e));
+    }
+  }
+
+  @override
+  Future<Result<Property>> unpublish(String id) async {
+    try {
+      final response = await _api.post<Map<String, dynamic>>('/properties/$id/unpublish');
       return Success(PropertyDto.fromJson(response.data!['data'] as Map<String, dynamic>));
     } on DioException catch (e) {
       return Failure(mapDioErrorToFailure(e));
