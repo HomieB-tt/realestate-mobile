@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/app_failure.dart';
 import '../../domain/entities/viewing.dart';
 import '../providers/viewing_providers.dart';
+import 'booking_detail_screen.dart';
 import '../../../property/domain/repositories/property_repository.dart' show Success, Failure;
 
 class MyBookingsScreen extends ConsumerWidget {
@@ -86,32 +87,40 @@ class _BookingTileState extends ConsumerState<_BookingTile> {
     final viewing = widget.viewing;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _formatDateTime(viewing.scheduledAt),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  _StatusLabel(status: viewing.status),
-                ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => BookingDetailScreen(viewing: viewing)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatDateTime(viewing.scheduledAt),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    _StatusLabel(status: viewing.status),
+                  ],
+                ),
               ),
-            ),
-            if (_canCancel)
-              _cancelling
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : TextButton(onPressed: _cancel, child: const Text('Cancel')),
-          ],
+              if (_canCancel)
+                _cancelling
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : TextButton(onPressed: _cancel, child: const Text('Cancel'))
+              else
+                Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+            ],
+          ),
         ),
       ),
     );
