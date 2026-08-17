@@ -25,6 +25,9 @@ dependencies:
   # Image selection for property photo upload
   image_picker: ^1.1.2
 
+  # Opens a property's location in Google Maps (app if installed, browser fallback)
+  url_launcher: ^6.3.0
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

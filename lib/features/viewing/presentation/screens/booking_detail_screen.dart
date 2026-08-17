@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/app_failure.dart';
+import '../../../../core/maps/map_launcher.dart';
 import '../../../property/presentation/providers/property_providers.dart';
 import '../../../property/presentation/screens/property_detail_screen.dart';
 import '../../domain/entities/viewing.dart';
@@ -64,32 +65,55 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
             error: (error, _) => Text(
               error is AppFailure ? error.message : 'Could not load property details.',
             ),
-            data: (property) => Card(
-              child: InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => PropertyDetailScreen(propertyId: property.id)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(property.title, style: theme.textTheme.titleMedium),
-                            const SizedBox(height: 4),
-                            Text('${property.addressLine}, ${property.city}'),
-                            const SizedBox(height: 4),
-                            Text(property.formattedPrice, style: theme.textTheme.bodySmall),
-                          ],
-                        ),
+            data: (property) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(propertyId: property.id)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(property.title, style: theme.textTheme.titleMedium),
+                                const SizedBox(height: 4),
+                                Text('${property.addressLine}, ${property.city}'),
+                                const SizedBox(height: 4),
+                                Text(property.formattedPrice, style: theme.textTheme.bodySmall),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
                       ),
-                      const Icon(Icons.chevron_right),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final opened = await openInMaps(
+                      lat: property.location.lat,
+                      lng: property.location.lng,
+                      label: property.title,
+                    );
+                    if (!context.mounted) return;
+                    if (!opened) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not open maps on this device.')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.directions_outlined),
+                  label: const Text('Get directions'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),

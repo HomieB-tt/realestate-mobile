@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/app_failure.dart';
+import '../../../../core/maps/map_launcher.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../viewing/domain/entities/viewing.dart';
 import '../../../viewing/presentation/providers/viewing_providers.dart';
@@ -67,6 +68,27 @@ class PropertyDetailScreen extends ConsumerWidget {
                       Text(property.title, style: Theme.of(context).textTheme.headlineSmall),
                       const SizedBox(height: 4),
                       Text('${property.addressLine}, ${property.city}, ${property.country}'),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                          onPressed: () async {
+                            final opened = await openInMaps(
+                              lat: property.location.lat,
+                              lng: property.location.lng,
+                              label: property.title,
+                            );
+                            if (!context.mounted) return;
+                            if (!opened) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not open maps on this device.')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.directions_outlined, size: 18),
+                          label: const Text('Get directions'),
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         property.formattedPrice,

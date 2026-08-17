@@ -83,6 +83,25 @@ demo coordinate automatically in that case (see `PropertyListScreen`), so
 this isn't a blocker for testing, just something to expect until you're
 on a device with real GPS.
 
+### url_launcher — one more manifest addition
+
+A third package, `url_launcher`, was added to open a property's location
+in Google Maps ("Get directions"). Android 11+ restricts which apps your
+app can even *see* are installed (package visibility) — without
+declaring intent, resolving an implicit `https://` link to "is Maps
+installed?" can silently fail on some devices. Add this as a **sibling**
+of `<application>`, same level as the `<uses-permission>` entries above
+(not nested inside either):
+
+```xml
+<queries>
+    <intent>
+        <action android:name="android.intent.action.VIEW" />
+        <data android:scheme="https" />
+    </intent>
+</queries>
+```
+
 ## New in this round
 
 - **Navigation shell** (`features/shell/root_shell.dart`) — bottom tabs: Search, Bookings, Listings (agent-only), Account. Previously there was no way to sign out from the app at all; that's now on the Account tab.
