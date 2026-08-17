@@ -3,6 +3,7 @@ import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/location/location_service.dart';
 import '../../domain/entities/property.dart';
 import '../../domain/repositories/property_repository.dart';
 import '../../domain/repositories/property_image_repository.dart';
@@ -38,6 +39,48 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
   bool _submitting = false;
   String? _errorMessage;
 
+  static const _locationService = LocationService();
+  bool _resolvingLocation = false;
+  String? _locationStatusMessage;
+
+  Future<void> _useCurrentLocation() async {
+    setState(() {
+      _resolvingLocation = true;
+      _locationStatusMessage = null;
+    });
+
+    final result = await _locationService.getCurrentLocation();
+
+    if (!mounted) return;
+
+    switch (result) {
+      case LocationSuccess(:final lng, :final lat):
+        setState(() {
+          _lngController.text = lng.toStringAsFixed(6);
+          _latController.text = lat.toStringAsFixed(6);
+          _resolvingLocation = false;
+          _locationStatusMessage = 'Location captured — adjust manually if needed.';
+        });
+      case LocationServiceDisabled():
+        setState(() {
+          _resolvingLocation = false;
+          _locationStatusMessage = 'Location services are off. Enable them or enter coordinates manually.';
+        });
+      case LocationPermissionDenied(:final permanently):
+        setState(() {
+          _resolvingLocation = false;
+          _locationStatusMessage = permanently
+              ? 'Location permission denied. Enable it in system settings, or enter coordinates manually.'
+              : 'Location permission denied. Enter coordinates manually.';
+        });
+      case LocationUnknownError():
+        setState(() {
+          _resolvingLocation = false;
+          _locationStatusMessage = 'Could not get your location. Enter coordinates manually.';
+        });
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [
@@ -60,7 +103,16 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
 
   Future<void> _pickImages() async {
     final picker = ImagePicker();
-    final images = await picker.pickMultiImage(imageQuality: 85);
+    // Constrain dimensions, not just JPEG quality — an unconstrained pick
+    // can return a full-resolution camera image (e.g. 4000x3000+), which
+    // is expensive to decode for the inline preview and can OOM-crash on
+    // resource-limited emulators (observed on Waydroid). 1600px is more
+    // than enough for a property photo.
+    final images = await picker.pickMultiImage(
+      imageQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (images.isEmpty) return;
     setState(() => _selectedImages.addAll(images));
   }
@@ -263,6 +315,18 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
               ],
             ),
             const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _resolvingLocation ? null : _useCurrentLocation,
+              icon: _resolvingLocation
+                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location),
+              label: const Text('Use current location'),
+            ),
+            if (_locationStatusMessage != null) ...[
+              const SizedBox(height: 6),
+              Text(_locationStatusMessage!, style: Theme.of(context).textTheme.bodySmall),
+            ],
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(

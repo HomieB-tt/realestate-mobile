@@ -4,6 +4,7 @@ import '../../../../core/error/app_failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../viewing/domain/entities/viewing.dart';
 import '../../../viewing/presentation/providers/viewing_providers.dart';
+import '../../../viewing/presentation/screens/property_viewings_screen.dart';
 import '../providers/property_providers.dart';
 import '../../domain/entities/property.dart';
 import '../../domain/repositories/property_repository.dart' show Success, Failure;
@@ -27,7 +28,7 @@ class PropertyDetailScreen extends ConsumerWidget {
           child: Text(error is AppFailure ? error.message : 'Something went wrong.'),
         ),
         data: (property) {
-          final isOwner = currentUserAsync.value?.id == property.agentId;
+          final isOwner = currentUserAsync.valueOrNull?.id == property.agentId;
 
           return SingleChildScrollView(
             child: Column(
@@ -89,7 +90,17 @@ class PropertyDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 20),
                       Text(property.description),
                       const SizedBox(height: 28),
-                      if (property.status == PropertyStatus.published)
+                      if (property.status == PropertyStatus.published && isOwner)
+                        ElevatedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PropertyViewingsScreen(propertyId: property.id),
+                            ),
+                          ),
+                          icon: const Icon(Icons.list_alt_outlined),
+                          label: const Text('View booking requests'),
+                        )
+                      else if (property.status == PropertyStatus.published)
                         ElevatedButton.icon(
                           onPressed: () => _showBookingSheet(context, ref, property.id),
                           icon: const Icon(Icons.calendar_month_outlined),

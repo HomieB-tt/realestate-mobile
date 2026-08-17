@@ -21,18 +21,9 @@ final propertyImageRepositoryProvider = Provider<PropertyImageRepository>((ref) 
 });
 
 /// Search parameters currently applied by the user. Screens update this
-/// via `ref.read(searchParamsProvider.notifier).updateParams(...)`; `nearbyPropertiesProvider` reacts
+/// via `ref.read(...).state = ...`; `nearbyPropertiesProvider` reacts
 /// automatically since it watches this provider.
-class SearchParamsNotifier extends Notifier<RadiusSearchParams?> {
-  @override
-  RadiusSearchParams? build() => null;
-
-  void updateParams(RadiusSearchParams? newParams) {
-    state = newParams;
-  }
-}
-
-final searchParamsProvider = NotifierProvider<SearchParamsNotifier, RadiusSearchParams?>(SearchParamsNotifier.new);
+final searchParamsProvider = StateProvider<RadiusSearchParams?>((ref) => null);
 
 /// Fetches nearby published properties for the current search params.
 /// Returns an empty list (rather than erroring) until a search has been

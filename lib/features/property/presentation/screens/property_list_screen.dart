@@ -42,11 +42,11 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
 
     switch (result) {
       case LocationSuccess(:final lng, :final lat):
-        ref.read(searchParamsProvider.notifier).updateParams(RadiusSearchParams(
+        ref.read(searchParamsProvider.notifier).state = RadiusSearchParams(
           lng: lng,
           lat: lat,
           radiusMeters: 10000,
-        ));
+        );
       case LocationServiceDisabled():
       case LocationPermissionDenied():
       case LocationUnknownError():
@@ -54,7 +54,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
         // coordinate rather than leaving the screen stuck with no
         // search performed at all.
         setState(() => _usingFallbackLocation = true);
-        ref.read(searchParamsProvider.notifier).updateParams(_demoFallback);
+        ref.read(searchParamsProvider.notifier).state = _demoFallback;
     }
   }
 
